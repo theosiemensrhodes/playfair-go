@@ -66,3 +66,34 @@ func playfairDecrypt(ciphertext string, key []byte) string {
 	}
 	return string(decryptedText)
 }
+
+func playfairEncrypt(plaintext string, key []byte) string {
+	if len(key) != 25 {
+		panic("Key length must be 25")
+	}
+	position := make(map[byte]int, 25)
+	for i, char := range key {
+		position[char] = i
+	}
+	encryptedText := make([]byte, len(plaintext))
+	for i := 1; i < len(plaintext); i += 2 {
+		char1, char2 := plaintext[i-1], plaintext[i]
+		pos1, pos2 := position[char1], position[char2]
+		row1, col1 := pos1/5, pos1%5
+		row2, col2 := pos2/5, pos2%5
+		if row1 == row2 {
+			// Same row: shift right
+			encryptedText[i-1] = key[row1*5+(col1+1)%5]
+			encryptedText[i] = key[row2*5+(col2+1)%5]
+		} else if col1 == col2 {
+			// Same column: shift down
+			encryptedText[i-1] = key[((row1+1)%5)*5+col1]
+			encryptedText[i] = key[((row2+1)%5)*5+col2]
+		} else {
+			// Rectangle: swap columns
+			encryptedText[i-1] = key[row1*5+col2]
+			encryptedText[i] = key[row2*5+col1]
+		}
+	}
+	return string(encryptedText)
+}

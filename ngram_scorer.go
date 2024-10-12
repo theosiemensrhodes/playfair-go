@@ -9,14 +9,14 @@ import (
 	"sync"
 )
 
-type NgramScorer struct {
+type NgramScore struct {
 	ngrams map[string]float64
 	L      int
 	N      int
 	floor  float64
 }
 
-func NewNgramScorer(filename string, sep string) (*NgramScorer, error) {
+func NewNgramScore(filename string, sep string) (*NgramScore, error) {
 	ngrams := make(map[string]float64)
 	file, err := os.Open(filename)
 	if err != nil {
@@ -39,7 +39,7 @@ func NewNgramScorer(filename string, sep string) (*NgramScorer, error) {
 		return nil, err
 	}
 
-	scorer := &NgramScorer{ngrams: ngrams, L: len(key)}
+	scorer := &NgramScore{ngrams: ngrams, L: len(key)}
 	scorer.N = 0
 	for _, v := range ngrams {
 		scorer.N += int(v)
@@ -52,7 +52,7 @@ func NewNgramScorer(filename string, sep string) (*NgramScorer, error) {
 	return scorer, nil
 }
 
-func (scorer *NgramScorer) score(text string) float64 {
+func (scorer *NgramScore) score(text string) float64 {
 	score := 0.0
 	for i := 0; i <= len(text)-scorer.L; i++ {
 		ngram := text[i : i+scorer.L]
@@ -65,32 +65,31 @@ func (scorer *NgramScorer) score(text string) float64 {
 	return score
 }
 
-type NgramScore struct {
-	bigrams   *NgramScorer
-	trigrams  *NgramScorer
-	quadgrams *NgramScorer
+type NgramScorer struct {
+	bigrams   *NgramScore
+	trigrams  *NgramScore
+	quadgrams *NgramScore
 }
 
-var instance *NgramScore
-var once sync.Once
+var ngramScoreInstance *NgramScorer
+var ngramScoreOnce sync.Once
 
-func GetNgramScoreInstance() *NgramScore {
-	once.Do(func() {
-		instance = &NgramScore{}
+func GetNgramScorerInstance() *NgramScorer {
+	ngramScoreOnce.Do(func() {
+		ngramScoreInstance = &NgramScorer{}
 		var err error
-		instance.bigrams, err = NewNgramScorer("./resources/english_bigrams.txt", " ")
+		ngramScoreInstance.bigrams, err = NewNgramScore("./resources/english_bigrams.txt", " ")
 		if err != nil {
 			log.Fatal(err)
 		}
-		instance.trigrams, err = NewNgramScorer("./resources/english_trigrams.txt", " ")
+		ngramScoreInstance.trigrams, err = NewNgramScore("./resources/english_trigrams.txt", " ")
 		if err != nil {
 			log.Fatal(err)
 		}
-		instance.quadgrams, err = NewNgramScorer("./resources/english_quadgrams.txt", " ")
+		ngramScoreInstance.quadgrams, err = NewNgramScore("./resources/english_quadgrams.txt", " ")
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println("Loading ngram files")
 	})
-	return instance
+	return ngramScoreInstance
 }
