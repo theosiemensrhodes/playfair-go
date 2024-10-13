@@ -80,18 +80,27 @@ func (scorer *EnglishScorer) score(text string, power float64) float64 {
 	return (english_char_count / total_char_count)
 }
 
-var englishScorerInstance *EnglishScorer
-var englishScorerOnce sync.Once
+var corpusInstance *corpus.EnglishCorpus
+var corpusOnce sync.Once
 
-func GetEnglishScorerInstance() *EnglishScorer {
-	englishScorerOnce.Do(func() {
-		englishScorerInstance = &EnglishScorer{}
-		englishScorerInstance.corpus = corpus.NewEnglishCorpus()
-		var err error
-		englishScorerInstance.tree, err = NewBKTree("./resources/bktree.bin", "./resources/words.txt")
+func GetCorpusInstance() *corpus.EnglishCorpus {
+	corpusOnce.Do(func() {
+		corpus := corpus.NewEnglishCorpus()
+		corpusInstance = &corpus
+	})
+	return corpusInstance
+}
+
+var bktreeInstance *bktree.BKTree
+var bktreeOnce sync.Once
+
+func GetDictionaryInstance() *bktree.BKTree {
+	bktreeOnce.Do(func() {
+		bktree, err := NewBKTree("./resources/bktree.bin", "./resources/words.txt")
 		if err != nil {
 			log.Fatal(err)
 		}
+		bktreeInstance = bktree
 	})
-	return englishScorerInstance
+	return bktreeInstance
 }

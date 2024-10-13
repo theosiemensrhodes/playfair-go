@@ -1,10 +1,8 @@
-module playfair_crack
+module playfaircrack
 
 go 1.23.1
 
-require (
-	golang.org/x/term v0.25.0
-)
+require golang.org/x/term v0.25.0
 
 require (
 	github.com/AntoineAugusti/wordsegmentation v0.0.0-20190117104728-17d202823a3d // indirect
@@ -23,6 +21,7 @@ require (
 require (
 	github.com/agnivade/levenshtein v1.2.0
 	github.com/antoineaugusti/wordsegmentation v0.0.0-20190117104728-17d202823a3d
+	github.com/divan/num2words v0.0.0-20170904212200-57dba452f942
 	github.com/urfave/cli/v2 v2.27.4
 	golang.org/x/sys v0.26.0 // indirect
 )

@@ -15,17 +15,24 @@ const (
 	THRESHHOLD_ENGLISH float64 = 0.9
 )
 
+type SolutionData struct {
+	percentEnglish float64
+	plaintext      string
+	segmentedText  []string
+}
+
 func simulatedAnnealingCrack(
 	encryptedText string,
+	separatorLetter byte,
 	triesPerEpoch int,
 	initialTemp float64,
 	floorTemp float64,
 	coolingRate float64,
 	triesBeforeStagnation int,
 	startingKey []byte,
-) ([]byte, float64, bool) {
+) ([]byte, float64, *SolutionData) {
 	currentKey := bytes.Clone(startingKey)
-	currentScore := scoreText(playfairDecrypt(encryptedText, currentKey))
+	currentScore := scoreTextFast(playfairDecrypt(encryptedText, currentKey), separatorLetter)
 
 	bestKey := bytes.Clone(currentKey)
 	bestPlaintext := playfairDecrypt(encryptedText, bestKey)
@@ -37,10 +44,15 @@ func simulatedAnnealingCrack(
 		for index := 0; index < triesPerEpoch; index++ {
 			// We have stagnated, check if we are at solution
 			if iterSinceBest > triesBeforeStagnation {
-				englishScorer := GetEnglishScorerInstance()
-				englishScore := englishScorer.score(bestPlaintext, 1.5)
-				if englishScore > THRESHHOLD_ENGLISH {
-					return bestKey, bestScore, true
+				solution := &SolutionData{}
+				solution.plaintext = bestPlaintext
+				solution.percentEnglish, solution.segmentedText = scoreTextSlow(bestPlaintext, separatorLetter, 1.5)
+				if solution.percentEnglish > THRESHHOLD_ENGLISH {
+					if logVerbose {
+						fmt.Printf("\n")
+					}
+
+					return bestKey, bestScore, solution
 				}
 
 				iterSinceBest = 0
@@ -50,7 +62,7 @@ func simulatedAnnealingCrack(
 			candidateKey := bytes.Clone(currentKey)
 			permuteKey(candidateKey)
 			candidatePlaintext := playfairDecrypt(encryptedText, candidateKey)
-			candidateScore := scoreText(candidatePlaintext)
+			candidateScore := scoreTextFast(candidatePlaintext, separatorLetter)
 
 			// Calculate acceptance rate as function of current temperature
 			delta := candidateScore - currentScore
@@ -74,7 +86,7 @@ func simulatedAnnealingCrack(
 					if err != nil {
 						fmt.Printf("%d %s %s %f %f %s\n", iter, timestamp, bestKey, bestScore, curTemp, candidatePlaintext[:50])
 					} else {
-						fmt.Printf("%10d %s %s %-4.4f %4.4f %s\n", iter, timestamp, bestKey, bestScore, curTemp, candidatePlaintext[:width-65])
+						fmt.Printf("%10d %s %s %-4.4f %-4.4f %s\n", iter, timestamp, bestKey, bestScore, curTemp, candidatePlaintext[:width-65])
 					}
 				}
 				iterSinceBest = 0
@@ -85,5 +97,5 @@ func simulatedAnnealingCrack(
 		}
 	}
 
-	return bestKey, bestScore, false
+	return bestKey, bestScore, nil
 }
