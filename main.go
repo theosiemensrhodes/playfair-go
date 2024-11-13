@@ -49,8 +49,12 @@ func main() {
 						Usage:       "Log the cracking process verbosely",
 					},
 				},
-				Before: gatherInputText,
 				Action: func(cCtx *cli.Context) error {
+					err := gatherInputText()
+					if err != nil {
+						return err
+					}
+
 					err, ciphertext := validateAndTransformCiphertext(text, 'J')
 					if err != nil {
 						return err
@@ -80,8 +84,12 @@ func main() {
 						Action:      validateAndOpenFile,
 					},
 				},
-				Before: gatherInputText,
 				Action: func(cCtx *cli.Context) error {
+					err := gatherInputText()
+					if err != nil {
+						return err
+					}
+
 					err, ciphertext := validateAndTransformCiphertext(text, 'J')
 					if err != nil {
 						return err
@@ -125,8 +133,12 @@ func main() {
 						Action:      validateAndOpenFile,
 					},
 				},
-				Before: gatherInputText,
 				Action: func(cCtx *cli.Context) error {
+					err := gatherInputText()
+					if err != nil {
+						return err
+					}
+
 					err, plainText := validateAndTransformPlaintext(text, 'J', 'I', 'X')
 					if err != nil {
 						return err
@@ -155,7 +167,7 @@ func main() {
 	}
 }
 
-func gatherInputText(cCtx *cli.Context) error {
+func gatherInputText() error {
 	if text == "" {
 		// Read from stdin
 		// Check if the input is a pipe or file (not a terminal)
@@ -180,6 +192,5 @@ func gatherInputText(cCtx *cli.Context) error {
 	}
 
 	// Else we have read from file
-
 	return nil
 }

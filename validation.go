@@ -44,7 +44,6 @@ func validateAndTransformKey(key string, excludedLetter rune) (error, string) {
 			if l == excludedLetter || strings.ContainsRune(transformed.String(), l) {
 				continue
 			}
-
 			transformed.WriteRune(l)
 		}
 
