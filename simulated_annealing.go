@@ -2,63 +2,45 @@ package main
 
 import (
 	"bytes"
-	"fmt"
+	"context"
 	"math"
 	"math/rand"
-	"os"
-	"time"
-
-	"golang.org/x/term"
 )
-
-const (
-	THRESHHOLD_ENGLISH float64 = 0.9
-)
-
-type SolutionData struct {
-	percentEnglish float64
-	plaintext      string
-	segmentedText  []string
-}
 
 func simulatedAnnealingCrack(
-	encryptedText string,
+	ctx context.Context,
+	globalData *GlobalData,
+	pid int,
+	startingKey []byte,
 	separatorLetter byte,
-	triesPerEpoch int,
+	encryptedText string,
 	initialTemp float64,
 	floorTemp float64,
 	coolingRate float64,
+	triesPerEpoch int,
 	triesBeforeStagnation int,
-	startingKey []byte,
-) ([]byte, float64, *SolutionData) {
+) ([]byte, float64) {
 	currentKey := bytes.Clone(startingKey)
 	currentScore := scoreTextFast(playfairDecrypt(encryptedText, currentKey), separatorLetter)
 
 	bestKey := bytes.Clone(currentKey)
-	bestPlaintext := playfairDecrypt(encryptedText, bestKey)
 	bestScore := currentScore
-	iter := 0
-	iterSinceBest := 0
 
+	iterSinceBest := 0
 	for curTemp := initialTemp; curTemp >= floorTemp; curTemp *= (1 - coolingRate) {
 		for index := 0; index < triesPerEpoch; index++ {
-			// We have stagnated, check if we are at solution
-			if iterSinceBest > triesBeforeStagnation {
-				solution := &SolutionData{}
-				solution.plaintext = bestPlaintext
-				solution.percentEnglish, solution.segmentedText = scoreTextSlow(bestPlaintext, separatorLetter, 1.5)
-				if solution.percentEnglish > THRESHHOLD_ENGLISH {
-					if logVerbose {
-						fmt.Printf("\n")
-					}
-
-					return bestKey, bestScore, solution
-				}
-
-				iterSinceBest = 0
+			select {
+			case <-ctx.Done():
+				// exit early
+				return bestKey, bestScore
+			default:
 			}
 
-			// We are not at solution, keep checking
+			// We have stagnated, check if we are at solution
+			if (-3000 < bestScore && iterSinceBest > (triesBeforeStagnation/10)) || iterSinceBest > triesBeforeStagnation {
+				return bestKey, bestScore
+			}
+
 			candidateKey := bytes.Clone(currentKey)
 			permuteKey(candidateKey)
 			candidatePlaintext := playfairDecrypt(encryptedText, candidateKey)
@@ -74,28 +56,64 @@ func simulatedAnnealingCrack(
 				currentKey = bytes.Clone(candidateKey)
 			}
 
-			// New global minimum, report it
+			// New global best, report it
 			if currentScore > bestScore {
 				bestScore = currentScore
 				bestKey = bytes.Clone(currentKey)
-				bestPlaintext = candidatePlaintext
-
-				timestamp := time.Now().Format("15:04:05")
-				width, _, err := term.GetSize(int(os.Stdout.Fd()))
-				if logVerbose {
-					if err != nil {
-						fmt.Printf("%d %s %s %f %f %s\n", iter, timestamp, bestKey, bestScore, curTemp, candidatePlaintext[:50])
-					} else {
-						fmt.Printf("%10d %s %s %-4.4f %-4.4f %s\n", iter, timestamp, bestKey, bestScore, curTemp, candidatePlaintext[:width-65])
-					}
-				}
 				iterSinceBest = 0
+			} else {
+				iterSinceBest++
 			}
+		}
 
-			iterSinceBest++
-			iter++
+		// Step annealing genetic algo
+		newKeyData := geneticSimulatedAnnealingStep(globalData, pid, curTemp, currentKey, currentScore)
+		currentKey, currentScore = newKeyData.key, newKeyData.score
+	}
+
+	return bestKey, bestScore
+}
+
+func geneticSimulatedAnnealingStep(
+	globalData *GlobalData,
+	pid int,
+	temp float64,
+	bestKey []byte,
+	bestScore float64,
+) KeyData {
+	globalData.currentLock.Lock()
+	defer globalData.currentLock.Unlock()
+
+	globalData.currentKeys[pid].key = bestKey
+	globalData.currentKeys[pid].score = bestScore
+
+	// Generate energies
+	pdf := make([]float64, len(globalData.currentKeys))
+	sum := 0.0
+	for i, keyData := range globalData.currentKeys {
+		pdf[i] = math.Exp(keyData.score / temp) // e^E_i/T
+		sum += pdf[i]
+	}
+
+	// Normalize and integrate
+	for i, energy := range pdf {
+		normalized := energy / sum
+
+		if i == 0 {
+			pdf[i] = normalized
+		} else {
+			pdf[i] = normalized + pdf[i-1]
 		}
 	}
 
-	return bestKey, bestScore, nil
+	// Pick next key
+	point := rand.Float64()
+	for i, energy := range pdf {
+		if point < energy {
+			return globalData.currentKeys[i]
+		}
+	}
+
+	// If float error, fallback on last
+	return globalData.currentKeys[len(globalData.currentKeys)-1]
 }

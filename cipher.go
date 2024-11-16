@@ -2,6 +2,18 @@ package main
 
 import "math/rand"
 
+func generateRandomKey(excludedLetter byte) []byte {
+	var key []byte
+	letters := []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	for _, l := range letters {
+		if l != excludedLetter {
+			key = append(key, l)
+		}
+	}
+	rand.Shuffle(len(key), func(i, j int) { key[i], key[j] = key[j], key[i] })
+	return key
+}
+
 func permuteKey(key []byte) {
 	if len(key) != 25 {
 		panic("Key length must be 25")
